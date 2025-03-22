@@ -9,7 +9,7 @@ struct WeatherWidget: View {
     @State private var sunAnimationScale = 1.0
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             if viewModel.isLoading {
                 loadingView
             } else if let weather = viewModel.currentWeather {
@@ -29,6 +29,9 @@ struct WeatherWidget: View {
                 placeholderView
             }
         }
+        .background(Color(.systemBackground).opacity(0.8))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
     
     // MARK: - Component Views

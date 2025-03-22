@@ -18,330 +18,126 @@ struct NewsFeedView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    
-                    TextField("Search news", text: $searchText)
-                        .onSubmit {
-                            viewModel.searchNews(query: searchText)
-                        }
-                    
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                            viewModel.fetchTopHeadlines()
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-                .padding(10)
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
-                .padding(.horizontal)
-                .padding(.top, 10)
-                
-                // Location selector and reload button
-                HStack {
-                    Button(action: {
-                        showCountrySelector = true
-                    }) {
-                        HStack {
-                            Text(userSettings.selectedCountry.flag)
-                                .font(.title3)
-                            
-                            Text("News for \(userSettings.selectedCountry.name)")
-                                .font(.caption)
-                                .foregroundColor(.primary)
-                            
-                            Image(systemName: "chevron.down")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemGray6).opacity(0.5))
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        withAnimation {
-                            isRefreshing = true
-                            if searchText.isEmpty {
-                                viewModel.fetchTopHeadlines()
-                            } else {
-                                viewModel.searchNews(query: searchText)
-                            }
-                            
-                            // Update weather also
-                            if let lat = userSettings.selectedCountry.id == "in" ? 28.6139 : 37.0902,
-                               let lon = userSettings.selectedCountry.id == "in" ? 77.2090 : -95.7129 {
-                                weatherViewModel.fetchWeather(lat: lat, lon: lon)
-                            }
-                            
-                            // Auto reset the refreshing state after a delay
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                isRefreshing = false
-                            }
-                        }
-                    }) {
-                        Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath.circle")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                            .rotationEffect(isRefreshing ? .degrees(360) : .degrees(0))
-                            .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
-                    }
-                    .disabled(viewModel.isLoading)
-                    .padding(.trailing)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                
-                // Weather widget
-                WeatherWidget(viewModel: weatherViewModel)
-                    .environmentObject(userSettings)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                
-                Divider()
-                    .padding(.bottom, 5)
-                
-                // Content
-                if viewModel.isLoading && viewModel.articles.isEmpty {
-                    Spacer()
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .padding()
-                    Spacer()
-                } else if let errorMessage = viewModel.errorMessage {
-                    Spacer()
-                    VStack {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundColor(.orange)
-                            .padding()
-                        
-                        Text("Error loading news")
-                            .font(.headline)
-                            .padding(.bottom, 4)
-                        
-                        Text(errorMessage)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        
-                        Button(action: {
-                            if searchText.isEmpty {
-                                viewModel.fetchTopHeadlines()
-                            } else {
-                                viewModel.searchNews(query: searchText)
-                            }
-                        }) {
-                            Text("Try Again")
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                        .padding(.top)
-                    }
-                    Spacer()
-                } else if viewModel.articles.isEmpty {
-                    Spacer()
-                    VStack {
-                        Image(systemName: "newspaper")
-                            .font(.largeTitle)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Search bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
-                            .padding()
                         
-                        Text("No news found")
-                            .font(.headline)
+                        TextField("Search news", text: $searchText)
+                            .onSubmit {
+                                viewModel.searchNews(query: searchText)
+                            }
                         
                         if !searchText.isEmpty {
-                            Text("Try another search term or region")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 4)
-                        } else {
-                            Text("Try selecting a different region")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 4)
+                            Button(action: {
+                                searchText = ""
+                                viewModel.fetchTopHeadlines()
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
                         }
-                        
+                    }
+                    .padding(10)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    
+                    // Location selector and reload button
+                    HStack {
                         Button(action: {
                             showCountrySelector = true
                         }) {
-                            Text("Select Region")
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                        .padding(.top, 16)
-                    }
-                    .padding()
-                    Spacer()
-                } else {
-                    // Trending news section
-                    if !viewModel.trendingArticles.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text("Trending")
-                                    .font(.headline)
+                                Text(userSettings.selectedCountry.flag)
+                                    .font(.title3)
+                                
+                                Text("News for \(userSettings.selectedCountry.name)")
+                                    .font(.caption)
                                     .foregroundColor(.primary)
                                 
-                                Image(systemName: "chart.line.uptrend.xyaxis")
-                                    .foregroundColor(.red)
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(viewModel.trendingArticles) { article in
-                                        TrendingArticleCard(article: article)
-                                            .frame(width: 260, height: 280)
-                                    }
-                                }
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                            }
-                            .frame(height: 300)
-                        }
-                        
-                        Divider()
-                            .padding(.vertical, 8)
-                    }
-                    
-                    // Main news feed
-                    List {
-                        if !searchText.isEmpty {
-                            Text("Search results for \"\(searchText)\"")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 16)
-                        } else {
-                            // Last refresh time indicator
-                            HStack {
-                                Text(viewModel.getFormattedRefreshTime())
+                                Image(systemName: "chevron.down")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                if !userSettings.interests.isEmpty {
-                                    NavigationLink(destination: InterestSelectorView(isPresented: .constant(true))) {
-                                        Text("Interests")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                }
                             }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 16)
-                            
-                            // Personalized news section
-                            if !userSettings.interests.isEmpty && !viewModel.personalizedArticles.isEmpty {
-                                Section(header: 
-                                    Text("Based on Your Interests")
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                        .padding(.top, 16)
-                                        .padding(.bottom, 8)
-                                        .padding(.horizontal, 16)
-                                ) {
-                                    ForEach(viewModel.personalizedArticles.prefix(3)) { article in
-                                        ArticleRowView(article: article, onShare: {
-                                            itemToShare = URL(string: article.url)
-                                            showShareSheet = true
-                                        })
-                                        .listRowInsets(EdgeInsets())
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 16)
-                                        .background(Color.blue.opacity(0.05))
-                                        .cornerRadius(8)
-                                    }
-                                    
-                                    if viewModel.personalizedArticles.count > 3 {
-                                        NavigationLink(destination: PersonalizedNewsView()) {
-                                            Text("See all personalized news")
-                                                .font(.subheadline)
-                                                .foregroundColor(.blue)
-                                                .padding(.vertical, 8)
-                                                .frame(maxWidth: .infinity, alignment: .center)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 4)
-                                    }
-                                }
-                                
-                                Text("Top Headlines")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                    .padding(.top, 16)
-                                    .padding(.bottom, 8)
-                                    .padding(.horizontal, 16)
-                            } else {
-                                Text("Top Headlines")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                    .padding(.vertical, 4)
-                                    .padding(.horizontal, 16)
-                            }
-                        }
-                        
-                        ForEach(viewModel.articles) { article in
-                            ArticleRowView(article: article, onShare: {
-                                itemToShare = URL(string: article.url)
-                                showShareSheet = true
-                            })
-                            .listRowInsets(EdgeInsets())
+                            .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
+                            .background(Color(.systemGray6).opacity(0.5))
+                            .cornerRadius(8)
                         }
+                        .buttonStyle(PlainButtonStyle())
                         
-                        if userSettings.interests.isEmpty {
-                            Button(action: {
-                                showInterestsSelector = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "star")
-                                        .foregroundColor(.yellow)
-                                    Text("Personalize your news feed")
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.secondary)
+                        Spacer()
+                        
+                        Button(action: {
+                            withAnimation {
+                                isRefreshing = true
+                                if searchText.isEmpty {
+                                    viewModel.fetchTopHeadlines()
+                                } else {
+                                    viewModel.searchNews(query: searchText)
                                 }
-                                .padding()
-                                .background(Color(.systemGray6).opacity(0.7))
-                                .cornerRadius(10)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                
+                                // Update weather also
+                                if let lat = userSettings.selectedCountry.id == "in" ? 28.6139 : 37.0902,
+                                   let lon = userSettings.selectedCountry.id == "in" ? 77.2090 : -95.7129 {
+                                    weatherViewModel.fetchWeather(lat: lat, lon: lon)
+                                }
+                                
+                                // Auto reset the refreshing state after a delay
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                    isRefreshing = false
+                                }
                             }
-                            .buttonStyle(PlainButtonStyle())
+                        }) {
+                            Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath.circle")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                                .rotationEffect(isRefreshing ? .degrees(360) : .degrees(0))
+                                .animation(isRefreshing ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
                         }
+                        .disabled(viewModel.isLoading)
+                        .padding(.trailing)
                     }
-                    .listStyle(PlainListStyle())
-                    .refreshable {
-                        viewModel.refreshAllContent()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    // Weather widget
+                    WeatherWidget(viewModel: weatherViewModel)
+                        .environmentObject(userSettings)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity)
+                    
+                    Divider()
+                        .padding(.vertical, 5)
+                    
+                    // Loading/Error/Empty states
+                    if viewModel.isLoading && viewModel.articles.isEmpty {
+                        VStack {
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .padding()
+                            Spacer()
+                        }
+                        .frame(height: 300)
+                    } else if let errorMessage = viewModel.errorMessage {
+                        errorView(message: errorMessage)
+                    } else if viewModel.articles.isEmpty {
+                        emptyStateView()
+                    } else {
+                        newsContentView()
                     }
                 }
+                .navigationTitle("Rishi News")
+                .refreshable {
+                    viewModel.refreshAllContent()
+                }
             }
-            .navigationTitle("Rishi News")
             .sheet(isPresented: $showCountrySelector) {
                 CountrySelector(isPresented: $showCountrySelector)
                     .environmentObject(userSettings)
@@ -377,6 +173,239 @@ struct NewsFeedView: View {
                     weatherViewModel.fetchWeather(lat: lat, lon: lon)
                 }
             }
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    @ViewBuilder
+    private func errorView(message: String) -> some View {
+        VStack {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundColor(.orange)
+                .padding()
+            
+            Text("Error loading news")
+                .font(.headline)
+                .padding(.bottom, 4)
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button(action: {
+                if searchText.isEmpty {
+                    viewModel.fetchTopHeadlines()
+                } else {
+                    viewModel.searchNews(query: searchText)
+                }
+            }) {
+                Text("Try Again")
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+            .padding(.top)
+            Spacer()
+        }
+        .frame(height: 300)
+    }
+    
+    @ViewBuilder
+    private func emptyStateView() -> some View {
+        VStack {
+            Spacer()
+            Image(systemName: "newspaper")
+                .font(.largeTitle)
+                .foregroundColor(.gray)
+                .padding()
+            
+            Text("No news found")
+                .font(.headline)
+            
+            if !searchText.isEmpty {
+                Text("Try another search term or region")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            } else {
+                Text("Try selecting a different region")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
+            
+            Button(action: {
+                showCountrySelector = true
+            }) {
+                Text("Select Region")
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+            .padding(.top, 16)
+            Spacer()
+        }
+        .padding()
+        .frame(height: 300)
+    }
+    
+    @ViewBuilder
+    private func newsContentView() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Trending news section
+            if !viewModel.trendingArticles.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Trending")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .foregroundColor(.red)
+                    }
+                    .padding(.horizontal)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(viewModel.trendingArticles) { article in
+                                TrendingArticleCard(article: article)
+                                    .frame(width: 260, height: 240)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                    }
+                    .frame(height: 260)
+                }
+                
+                Divider()
+                    .padding(.horizontal)
+            }
+            
+            // Search results header
+            if !searchText.isEmpty {
+                Text("Search results for \"\(searchText)\"")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 16)
+            } else {
+                // Last refresh time indicator
+                HStack {
+                    Text(viewModel.getFormattedRefreshTime())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if !userSettings.interests.isEmpty {
+                        NavigationLink(destination: InterestSelectorView(isPresented: .constant(true))) {
+                            Text("Interests")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+            }
+            
+            // Personalized news section
+            if !searchText.isEmpty == false && !userSettings.interests.isEmpty && !viewModel.personalizedArticles.isEmpty {
+                Text("Based on Your Interests")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    .padding(.horizontal, 16)
+                
+                VStack(spacing: 12) {
+                    ForEach(viewModel.personalizedArticles.prefix(3)) { article in
+                        ArticleRowView(article: article, onShare: {
+                            itemToShare = URL(string: article.url)
+                            showShareSheet = true
+                        })
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.blue.opacity(0.05))
+                        .cornerRadius(8)
+                    }
+                    
+                    if viewModel.personalizedArticles.count > 3 {
+                        NavigationLink(destination: PersonalizedNewsView()) {
+                            Text("See all personalized news")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
+                    }
+                }
+                .padding(.horizontal, 16)
+                
+                Text("Top Headlines")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    .padding(.horizontal, 16)
+            } else if !searchText.isEmpty == false {
+                Text("Top Headlines")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 16)
+            }
+            
+            // Main news list
+            LazyVStack(spacing: 16) {
+                ForEach(viewModel.articles) { article in
+                    ArticleRowView(article: article, onShare: {
+                        itemToShare = URL(string: article.url)
+                        showShareSheet = true
+                    })
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                }
+                
+                if userSettings.interests.isEmpty {
+                    Button(action: {
+                        showInterestsSelector = true
+                    }) {
+                        HStack {
+                            Image(systemName: "star")
+                                .foregroundColor(.yellow)
+                            Text("Personalize your news feed")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6).opacity(0.7))
+                        .cornerRadius(10)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.bottom, 16)
         }
     }
 }
@@ -432,7 +461,7 @@ struct TrendingArticleCard: View {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(height: 150)
+                                .frame(height: 130)
                                 .clipped()
                                 .cornerRadius(8)
                         case .failure:
@@ -451,11 +480,11 @@ struct TrendingArticleCard: View {
                                 .cornerRadius(8)
                         }
                     }
-                    .frame(height: 150)
+                    .frame(height: 130)
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
-                        .frame(height: 150)
+                        .frame(height: 130)
                         .cornerRadius(8)
                         .overlay(
                             Image(systemName: "newspaper.fill")
@@ -490,7 +519,7 @@ struct TrendingArticleCard: View {
             }
             .background(Color(.systemBackground))
             .cornerRadius(10)
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+            .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -596,18 +625,22 @@ struct PersonalizedNewsView: View {
                 }
                 Spacer()
             } else {
-                List {
-                    ForEach(viewModel.personalizedArticles) { article in
-                        ArticleRowView(article: article, onShare: {
-                            itemToShare = URL(string: article.url)
-                            showShareSheet = true
-                        })
-                        .listRowInsets(EdgeInsets())
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(viewModel.personalizedArticles) { article in
+                            ArticleRowView(article: article, onShare: {
+                                itemToShare = URL(string: article.url)
+                                showShareSheet = true
+                            })
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(8)
+                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        }
                     }
+                    .padding(.vertical, 16)
                 }
-                .listStyle(PlainListStyle())
                 .refreshable {
                     viewModel.fetchPersonalizedNews()
                 }
