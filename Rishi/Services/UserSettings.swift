@@ -13,6 +13,9 @@ class UserSettings: ObservableObject {
         static let bookmarkedArticles = "bookmarkedArticles"
         static let interests = "interests"
         static let autoRefreshInterval = "autoRefreshInterval"
+        static let readArticles = "readArticles"
+        static let readingHistory = "readingHistory"
+        static let appTheme = "appTheme"
     }
     
     // Current selected country
@@ -74,6 +77,36 @@ class UserSettings: ObservableObject {
         }
     }
     
+    // Reading history - articles the user has read
+    @Published var readingHistory: [ReadHistoryItem] = [] {
+        didSet {
+            // Keep only the last 100 articles
+            if readingHistory.count > 100 {
+                readingHistory = Array(readingHistory.prefix(100))
+            }
+            
+            if let data = try? JSONEncoder().encode(readingHistory) {
+                UserDefaults.standard.set(data, forKey: Keys.readingHistory)
+            }
+        }
+    }
+    
+    // Set of read article URLs for quick lookup
+    @Published var readArticles: Set<String> = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(Array(readArticles)) {
+                UserDefaults.standard.set(data, forKey: Keys.readArticles)
+            }
+        }
+    }
+    
+    // App theme
+    @Published var appTheme: AppTheme {
+        didSet {
+            UserDefaults.standard.set(appTheme.rawValue, forKey: Keys.appTheme)
+        }
+    }
+    
     // Font size options
     enum FontSize: Int, CaseIterable {
         case small = 0
@@ -102,6 +135,66 @@ class UserSettings: ObservableObject {
             case .medium: return 20
             case .large: return 24
             }
+        }
+    }
+    
+    // App theme options
+    enum AppTheme: Int, CaseIterable {
+        case system = 0
+        case light = 1
+        case dark = 2
+        case blue = 3
+        case green = 4
+        case orange = 5
+        
+        var title: String {
+            switch self {
+            case .system: return "System Default"
+            case .light: return "Light"
+            case .dark: return "Dark"
+            case .blue: return "Blue"
+            case .green: return "Green"
+            case .orange: return "Orange"
+            }
+        }
+        
+        var accentColor: Color {
+            switch self {
+            case .system, .light, .dark: return .blue
+            case .blue: return Color(red: 0, green: 0.5, blue: 0.9)
+            case .green: return Color(red: 0.1, green: 0.7, blue: 0.4)
+            case .orange: return Color(red: 1.0, green: 0.5, blue: 0.1)
+            }
+        }
+        
+        var backgroundColor: Color {
+            switch self {
+            case .system, .light: return Color(.systemBackground)
+            case .dark: return Color.black
+            case .blue: return Color(red: 0.9, green: 0.95, blue: 1.0)
+            case .green: return Color(red: 0.9, green: 1.0, blue: 0.95)
+            case .orange: return Color(red: 1.0, green: 0.98, blue: 0.95)
+            }
+        }
+        
+        var textColor: Color {
+            switch self {
+            case .system, .light, .blue, .green, .orange: return Color.primary
+            case .dark: return Color.white
+            }
+        }
+    }
+    
+    // Reading history item
+    struct ReadHistoryItem: Codable, Identifiable {
+        let id: UUID
+        let article: Article
+        let timestamp: Date
+        
+        init(article: Article, timestamp: Date = Date()) {
+            self.id = UUID()
+            self.article = article
+            self.timestamp = timestamp
         }
     }
     
@@ -134,6 +227,10 @@ class UserSettings: ObservableObject {
         let rawFontSize = UserDefaults.standard.integer(forKey: Keys.fontSize)
         self.fontSize = FontSize(rawValue: rawFontSize) ?? .medium
         
+        // App theme
+        let rawTheme = UserDefaults.standard.integer(forKey: Keys.appTheme)
+        self.appTheme = AppTheme(rawValue: rawTheme) ?? .system
+        
         // Categories visibility
         if let data = UserDefaults.standard.data(forKey: Keys.showCategories),
            let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
@@ -149,58 +246,94 @@ class UserSettings: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: Keys.bookmarkedArticles),
            let decoded = try? JSONDecoder().decode([Article].self, from: data) {
             self.bookmarkedArticles = decoded
+        } else {
+            self.bookmarkedArticles = []
         }
         
-        // Load interests
+        // Load user interests
         if let data = UserDefaults.standard.data(forKey: Keys.interests),
            let decoded = try? JSONDecoder().decode([String].self, from: data) {
             self.interests = decoded
+        } else {
+            self.interests = []
         }
         
-        // Auto-refresh interval
+        // Load auto-refresh interval
         self.autoRefreshInterval = UserDefaults.standard.integer(forKey: Keys.autoRefreshInterval)
+        
+        // Load reading history
+        if let data = UserDefaults.standard.data(forKey: Keys.readingHistory),
+           let decoded = try? JSONDecoder().decode([ReadHistoryItem].self, from: data) {
+            self.readingHistory = decoded
+        } else {
+            self.readingHistory = []
+        }
+        
+        // Load read articles
+        if let data = UserDefaults.standard.data(forKey: Keys.readArticles),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            self.readArticles = Set(decoded)
+        } else {
+            self.readArticles = []
+        }
     }
     
-    // Get all available categories
+    // MARK: - Helper Methods
+    
     func getAllCategories() -> [String] {
         return defaultCategories
     }
     
-    // Get visible categories
-    func getVisibleCategories() -> [String] {
-        return showCategories.filter { $0.value }.map { $0.key }
+    func getSuggestedInterests() -> [String] {
+        var suggestions = Set<String>()
+        for category in interestSuggestions.keys {
+            if let topicSuggestions = interestSuggestions[category] {
+                suggestions.formUnion(topicSuggestions)
+            }
+        }
+        return Array(suggestions).sorted()
     }
     
-    // Bookmark management
-    func isArticleBookmarked(_ article: Article) -> Bool {
-        return bookmarkedArticles.contains { $0.id == article.id }
+    func getSuggestedInterests(forCategory category: String?) -> [String] {
+        guard let category = category, 
+              let suggestions = interestSuggestions[category.lowercased()] else {
+            return getSuggestedInterests()
+        }
+        return suggestions.sorted()
     }
     
-    func toggleBookmark(for article: Article) {
-        if isArticleBookmarked(article) {
-            bookmarkedArticles.removeAll { $0.id == article.id }
-        } else {
+    func addBookmark(_ article: Article) {
+        if !isArticleBookmarked(article) {
             bookmarkedArticles.append(article)
         }
     }
     
-    // Interest management
-    func getSuggestedInterests(forCategory category: String? = nil) -> [String] {
-        if let category = category, let suggestions = interestSuggestions[category] {
-            return suggestions
-        }
-        
-        // Return all suggestions
-        var allSuggestions: [String] = []
-        for suggestions in interestSuggestions.values {
-            allSuggestions.append(contentsOf: suggestions)
-        }
-        return Array(Set(allSuggestions)).sorted()
+    func removeBookmark(_ article: Article) {
+        bookmarkedArticles.removeAll { $0.url == article.url }
     }
     
-    func isInterestSelected(_ interest: String) -> Bool {
-        return interests.contains(interest)
+    func isArticleBookmarked(_ article: Article) -> Bool {
+        return bookmarkedArticles.contains { $0.url == article.url }
     }
+    
+    func markArticleAsRead(_ article: Article) {
+        readArticles.insert(article.url)
+        
+        // Add to reading history
+        let historyItem = ReadHistoryItem(article: article)
+        readingHistory.insert(historyItem, at: 0)
+    }
+    
+    func isArticleRead(_ article: Article) -> Bool {
+        return readArticles.contains(article.url)
+    }
+    
+    func clearReadingHistory() {
+        readingHistory.removeAll()
+        readArticles.removeAll()
+    }
+    
+    // MARK: - Interest Management
     
     func toggleInterest(_ interest: String) {
         if isInterestSelected(interest) {
@@ -208,6 +341,10 @@ class UserSettings: ObservableObject {
         } else {
             interests.append(interest)
         }
+    }
+    
+    func isInterestSelected(_ interest: String) -> Bool {
+        return interests.contains(interest)
     }
     
     func clearAllInterests() {

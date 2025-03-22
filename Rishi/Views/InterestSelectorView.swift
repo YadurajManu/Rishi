@@ -9,9 +9,13 @@ struct InterestSelectorView: View {
     @State private var showConfetti = false
     
     private var filteredInterests: [String] {
-        var interests = selectedCategory == nil 
-            ? userSettings.getSuggestedInterests() 
-            : userSettings.getSuggestedInterests(forCategory: selectedCategory)
+        var interests: [String]
+        
+        if selectedCategory == nil {
+            interests = userSettings.getSuggestedInterests()
+        } else {
+            interests = userSettings.getSuggestedInterests(forCategory: selectedCategory!)
+        }
         
         if !searchText.isEmpty {
             interests = interests.filter { $0.lowercased().contains(searchText.lowercased()) }
