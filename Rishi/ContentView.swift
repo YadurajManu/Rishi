@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @AppStorage("darkMode") private var darkMode = false
+    @EnvironmentObject private var userSettings: UserSettings
     @AppStorage("onboardingComplete") private var onboardingComplete = false
     @State private var showOnboarding = false
     
@@ -20,9 +20,10 @@ struct ContentView: View {
                 }
             } else {
                 MainTabView()
+                    .environmentObject(userSettings)
             }
         }
-        .preferredColorScheme(darkMode ? .dark : .light)
+        .preferredColorScheme(userSettings.darkMode ? .dark : .light)
         .onAppear {
             if !onboardingComplete {
                 showOnboarding = true
@@ -38,9 +39,9 @@ struct OnboardingView: View {
     
     let pages = [
         OnboardingPage(image: "globe.americas.fill", title: "World News", description: "Stay up to date with the latest news from around the world."),
-        OnboardingPage(image: "chart.line.uptrend.xyaxis", title: "Business & Finance", description: "Track business trends and financial news that matter to you."),
-        OnboardingPage(image: "tv.fill", title: "Entertainment", description: "Get the latest on movies, music, and celebrity news."),
-        OnboardingPage(image: "bolt.fill", title: "Sports", description: "Follow your favorite teams and never miss an update.")
+        OnboardingPage(image: "globe.asia.australia.fill", title: "Regional News", description: "Get news specific to your region, including India, US, and many more."),
+        OnboardingPage(image: "newspaper.fill", title: "Categories", description: "Browse news by categories like Business, Technology, and Entertainment."),
+        OnboardingPage(image: "gear", title: "Customization", description: "Personalize your news experience with various settings and preferences.")
     ]
     
     var body: some View {

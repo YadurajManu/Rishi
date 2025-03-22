@@ -2,19 +2,19 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = 0
-    @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var userSettings: UserSettings
     
     var body: some View {
         TabView(selection: $selectedTab) {
             NewsFeedView()
-                .environmentObject(locationService)
+                .environmentObject(userSettings)
                 .tabItem {
                     Label("Top News", systemImage: "newspaper")
                 }
                 .tag(0)
             
             CategoryView()
-                .environmentObject(locationService)
+                .environmentObject(userSettings)
                 .tabItem {
                     Label("Categories", systemImage: "list.bullet")
                 }
@@ -27,55 +27,110 @@ struct MainTabView: View {
                 .tag(2)
             
             SettingsView()
+                .environmentObject(userSettings)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
                 .tag(3)
         }
+        .accentColor(.blue)
     }
 }
 
 struct CategoryView: View {
+    @EnvironmentObject private var userSettings: UserSettings
+    @State private var showCountrySelector = false
+    
     let categories = [
         ("Business", "briefcase", Color.blue),
         ("Entertainment", "film", Color.purple),
         ("Health", "heart", Color.pink),
         ("Science", "flask.fill", Color.orange),
         ("Sports", "sportscourt", Color.green),
-        ("Technology", "desktopcomputer", Color.indigo)
+        ("Technology", "desktopcomputer", Color.indigo),
+        ("World", "globe", Color.teal),
+        ("Politics", "building.columns", Color.red)
     ]
     
     var body: some View {
         NavigationView {
-            List {
-                ForEach(categories, id: \.0) { category, icon, color in
-                    NavigationLink {
-                        CategoryNewsView(category: category.lowercased())
-                    } label: {
-                        HStack {
-                            Image(systemName: icon)
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(color)
-                                .cornerRadius(8)
-                            
-                            Text(category)
-                                .font(.headline)
-                                .padding(.leading, 8)
-                        }
-                        .padding(.vertical, 8)
+            VStack(spacing: 0) {
+                // Country selector button
+                Button(action: {
+                    showCountrySelector = true
+                }) {
+                    HStack {
+                        Text(userSettings.selectedCountry.flag)
+                            .font(.title3)
+                        
+                        Text("News for \(userSettings.selectedCountry.name)")
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6).opacity(0.5))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+                
+                Divider()
+                
+                // Categories grid
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 16),
+                        GridItem(.flexible(), spacing: 16)
+                    ], spacing: 16) {
+                        ForEach(categories, id: \.0) { category, icon, color in
+                            NavigationLink {
+                                CategoryNewsView(category: category.lowercased())
+                                    .environmentObject(userSettings)
+                            } label: {
+                                VStack(spacing: 12) {
+                                    Image(systemName: icon)
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                        .frame(width: 50, height: 50)
+                                        .background(color)
+                                        .cornerRadius(25)
+                                    
+                                    Text(category)
+                                        .font(.subheadline)
+                                        .foregroundColor(.primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                                .background(Color(.systemGray6).opacity(0.5))
+                                .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding()
                 }
             }
             .navigationTitle("Categories")
+            .sheet(isPresented: $showCountrySelector) {
+                CountrySelector(isPresented: $showCountrySelector)
+                    .environmentObject(userSettings)
+            }
         }
     }
 }
 
 struct CategoryNewsView: View {
-    @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var userSettings: UserSettings
     let category: String
     @StateObject private var viewModel: NewsViewModel
+    @State private var showCountrySelector = false
     
     init(category: String) {
         self.category = category
@@ -83,23 +138,43 @@ struct CategoryNewsView: View {
     }
     
     var body: some View {
-        VStack {
-            // Location indicator
-            HStack {
-                Image(systemName: "location.fill")
-                    .foregroundColor(.blue)
-                Text("News for \(viewModel.userCountryName)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
+        VStack(spacing: 0) {
+            // Country selector button
+            Button(action: {
+                showCountrySelector = true
+            }) {
+                HStack {
+                    Text(userSettings.selectedCountry.flag)
+                        .font(.title3)
+                    
+                    Text("News for \(userSettings.selectedCountry.name)")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6).opacity(0.5))
+                .cornerRadius(8)
             }
+            .buttonStyle(PlainButtonStyle())
             .padding(.horizontal)
-            .padding(.bottom, 5)
+            .padding(.vertical, 10)
+            
+            Divider()
             
             if viewModel.isLoading {
+                Spacer()
                 ProgressView()
                     .scaleEffect(1.5)
+                Spacer()
             } else if let errorMessage = viewModel.errorMessage {
+                Spacer()
                 VStack {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
@@ -123,6 +198,36 @@ struct CategoryNewsView: View {
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
+                Spacer()
+            } else if viewModel.articles.isEmpty {
+                Spacer()
+                VStack {
+                    Image(systemName: "newspaper")
+                        .font(.largeTitle)
+                        .foregroundColor(.gray)
+                        .padding()
+                    
+                    Text("No \(category.capitalized) news found")
+                        .font(.headline)
+                    
+                    Text("Try selecting a different region")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+                    
+                    Button(action: {
+                        showCountrySelector = true
+                    }) {
+                        Text("Select Region")
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .padding(.top, 16)
+                }
+                Spacer()
             } else {
                 List {
                     ForEach(viewModel.articles) { article in
@@ -145,19 +250,20 @@ struct CategoryNewsView: View {
             }
         }
         .navigationTitle(category.capitalized)
+        .sheet(isPresented: $showCountrySelector) {
+            CountrySelector(isPresented: $showCountrySelector)
+                .environmentObject(userSettings)
+        }
         .onAppear {
-            // Create a new viewModel with the correct locationService when the view appears
-            if viewModel.userCountry == "us" && locationService.currentCountry != "us" {
-                let newViewModel = NewsViewModel(locationService: locationService)
-                // Copy over any state that needs to be preserved
-                newViewModel.isLoading = viewModel.isLoading
-                newViewModel.errorMessage = viewModel.errorMessage
-                // Use reflection to set the StateObject - hacky but works
-                if let mirror = Mirror(reflecting: _viewModel).children.first,
-                   let binding = mirror.value as? ReferenceWritableKeyPath<CategoryNewsView, NewsViewModel> {
-                    self[keyPath: binding] = newViewModel
-                }
+            // Create new viewModel with correct settings
+            let newViewModel = NewsViewModel(userSettings: userSettings)
+            
+            // Use reflection to set the StateObject
+            if let mirror = Mirror(reflecting: _viewModel).children.first,
+               let binding = mirror.value as? ReferenceWritableKeyPath<CategoryNewsView, NewsViewModel> {
+                self[keyPath: binding] = newViewModel
             }
+            
             loadCategoryNews()
         }
     }
@@ -193,18 +299,43 @@ struct BookmarksView: View {
 }
 
 struct SettingsView: View {
-    @AppStorage("darkMode") private var darkMode = false
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
+    @EnvironmentObject private var userSettings: UserSettings
+    @State private var showCountrySelector = false
     
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("Region")) {
+                    Button(action: {
+                        showCountrySelector = true
+                    }) {
+                        HStack {
+                            Text("News Region")
+                            
+                            Spacer()
+                            
+                            Text("\(userSettings.selectedCountry.flag) \(userSettings.selectedCountry.name)")
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
                 Section(header: Text("Appearance")) {
-                    Toggle("Dark Mode", isOn: $darkMode)
+                    Toggle("Dark Mode", isOn: $userSettings.darkMode)
+                    
+                    Picker("Font Size", selection: $userSettings.fontSize) {
+                        ForEach(UserSettings.FontSize.allCases, id: \.self) { size in
+                            Text(size.title).tag(size)
+                        }
+                    }
                 }
                 
                 Section(header: Text("Notifications")) {
-                    Toggle("Enable Notifications", isOn: $notificationsEnabled)
+                    Toggle("Enable Notifications", isOn: $userSettings.notificationsEnabled)
                 }
                 
                 Section(header: Text("About")) {
@@ -215,22 +346,116 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    HStack {
-                        Text("Terms of Service")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
+                    NavigationLink(destination: PrivacyPolicyView()) {
+                        Text("Privacy Policy")
                     }
                     
-                    HStack {
-                        Text("Privacy Policy")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
+                    NavigationLink(destination: TermsOfServiceView()) {
+                        Text("Terms of Service")
                     }
                 }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $showCountrySelector) {
+                CountrySelector(isPresented: $showCountrySelector)
+                    .environmentObject(userSettings)
+            }
         }
+    }
+}
+
+struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Privacy Policy")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 8)
+                
+                Group {
+                    Text("User Data Storage")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("We store user credentials, preferences, and settings using secure methods, in accordance with our Privacy Policy.")
+                }
+                
+                Group {
+                    Text("Location Data Collection")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("We use location data only to provide region-specific news. Your location data is not stored or shared with third parties.")
+                }
+                
+                Group {
+                    Text("Third-Party Services")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("Rishi News uses NewsData.io for news content. Their privacy policies may affect how your data is handled when accessing their content.")
+                }
+                
+                Group {
+                    Text("Data Protection")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("We do not sell, purchase, or engage in commercial activities with user data. Your data is used only to enhance your news reading experience.")
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Privacy Policy")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct TermsOfServiceView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Terms of Service")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 8)
+                
+                Group {
+                    Text("Content Usage")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("News content is provided for personal, non-commercial use only. Redistribution or commercial use is prohibited without express permission.")
+                }
+                
+                Group {
+                    Text("Accuracy and Liability")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("While we strive for accuracy, we cannot guarantee the completeness or timeliness of news. Rishi News is not liable for decisions made based on content provided.")
+                }
+                
+                Group {
+                    Text("Intellectual Property")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("All content, design, and functionality of Rishi News are protected by intellectual property laws and belong to their respective owners.")
+                }
+                
+                Group {
+                    Text("Modifications")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text("We reserve the right to modify these terms at any time. Continued use after changes constitutes acceptance of the new terms.")
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Terms of Service")
+        .navigationBarTitleDisplayMode(.inline)
     }
 } 

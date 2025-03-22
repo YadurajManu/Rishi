@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct RishiApp: App {
-    @StateObject private var locationService = LocationService()
+    @StateObject private var userSettings = UserSettings()
     
     // Register app defaults
     init() {
@@ -19,10 +19,7 @@ struct RishiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(locationService)
-                .onAppear {
-                    locationService.requestLocationPermission()
-                }
+                .environmentObject(userSettings)
         }
     }
     
@@ -31,7 +28,8 @@ struct RishiApp: App {
         UserDefaults.standard.register(defaults: [
             "darkMode": false,
             "onboardingComplete": false,
-            "notificationsEnabled": true
+            "notificationsEnabled": true,
+            "fontSize": 1 // medium
         ])
     }
 }

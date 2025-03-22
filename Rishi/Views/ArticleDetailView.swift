@@ -4,6 +4,7 @@ import SafariServices
 struct ArticleDetailView: View {
     let article: Article
     @State private var showSafari = false
+    @EnvironmentObject private var userSettings: UserSettings
     
     var body: some View {
         ScrollView {
@@ -11,27 +12,27 @@ struct ArticleDetailView: View {
                 // Header with source and date
                 HStack {
                     Text(article.source.name)
-                        .font(.subheadline)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .foregroundColor(.secondary)
                     
                     Spacer()
                     
                     Text(formattedDate(from: article.publishedAt))
-                        .font(.subheadline)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal)
                 
                 // Title
                 Text(article.title)
-                    .font(.title)
+                    .font(.system(size: userSettings.fontSize.headlineSize + 4))
                     .fontWeight(.bold)
                     .padding(.horizontal)
                 
                 // Author
                 if let author = article.author, !author.isEmpty {
                     Text("By \(author)")
-                        .font(.subheadline)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                 }
@@ -70,16 +71,26 @@ struct ArticleDetailView: View {
                 // Description
                 if let description = article.description, !description.isEmpty {
                     Text(description)
-                        .font(.body)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .padding(.horizontal)
                 }
                 
                 // Content
                 if let content = article.content, !content.isEmpty {
                     Text(content)
-                        .font(.body)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .padding(.horizontal)
                 }
+                
+                // Region indicator
+                HStack {
+                    Text(userSettings.selectedCountry.flag)
+                    Text("News from \(userSettings.selectedCountry.name)")
+                        .font(.system(size: userSettings.fontSize.textSize - 2))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
                 
                 // Read full article button
                 Button(action: {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ArticleCard: View {
     let article: Article
+    @EnvironmentObject private var userSettings: UserSettings
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -42,32 +43,33 @@ struct ArticleCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(article.source.name)
-                    .font(.caption)
+                    .font(.system(size: userSettings.fontSize.textSize - 2))
                     .foregroundColor(.secondary)
                     .padding(.top, 4)
                 
                 Text(article.title)
-                    .font(.headline)
+                    .font(.system(size: userSettings.fontSize.headlineSize))
+                    .fontWeight(.semibold)
                     .foregroundColor(.primary)
                     .lineLimit(2)
                 
                 if let description = article.description, !description.isEmpty {
                     Text(description)
-                        .font(.subheadline)
+                        .font(.system(size: userSettings.fontSize.textSize))
                         .foregroundColor(.secondary)
                         .lineLimit(3)
                 }
                 
                 HStack {
                     Text(formattedDate(from: article.publishedAt))
-                        .font(.caption)
+                        .font(.system(size: userSettings.fontSize.textSize - 2))
                         .foregroundColor(.secondary)
                     
                     Spacer()
                     
                     if let author = article.author, !author.isEmpty {
                         Text("By \(author)")
-                            .font(.caption)
+                            .font(.system(size: userSettings.fontSize.textSize - 2))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }

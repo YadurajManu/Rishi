@@ -5,26 +5,30 @@ class NewsViewModel: ObservableObject {
     @Published var articles: [Article] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
-    @Published var userCountry: String = "us"
-    @Published var userCountryName: String = "United States"
+    @Published var userCountry: String = "in"
+    @Published var userCountryName: String = "India"
     
     let newsService = NewsService()
     var cancellables = Set<AnyCancellable>()
+    private var userSettings: UserSettings?
     
-    init(locationService: LocationService? = nil) {
-        // Subscribe to location updates if provided
-        locationService?.$currentCountry
+    init(userSettings: UserSettings? = nil) {
+        self.userSettings = userSettings
+        
+        // Subscribe to country changes
+        userSettings?.$selectedCountry
             .sink { [weak self] country in
-                self?.userCountry = country
+                self?.userCountry = country.id
+                self?.userCountryName = country.name
                 self?.fetchTopHeadlines()
             }
             .store(in: &cancellables)
         
-        locationService?.$currentCountryName
-            .sink { [weak self] name in
-                self?.userCountryName = name
-            }
-            .store(in: &cancellables)
+        // Set default country from settings
+        if let settings = userSettings {
+            userCountry = settings.selectedCountry.id
+            userCountryName = settings.selectedCountry.name
+        }
         
         fetchTopHeadlines()
     }
@@ -42,7 +46,7 @@ class NewsViewModel: ObservableObject {
                 }
             } receiveValue: { [weak self] response in
                 self?.articles = response.results
-                print("Received \(response.results.count) articles")
+                print("Received \(response.results.count) articles for country: \(self?.userCountry ?? "unknown")")
             }
             .store(in: &cancellables)
     }

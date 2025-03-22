@@ -11,6 +11,9 @@ class NewsService {
     // Reference to the location service for country-based news
     let locationService = LocationService()
     
+    // Default country is India
+    var defaultCountry = "in"
+    
     func fetchNews(category: String? = nil, query: String? = nil, country: String? = nil) -> AnyPublisher<NewsResponse, Error> {
         var components = URLComponents(string: baseUrl)!
         var queryItems = [URLQueryItem(name: "apikey", value: apiKey)]
@@ -24,8 +27,8 @@ class NewsService {
             queryItems.append(URLQueryItem(name: "q", value: query))
         }
         
-        // Use provided country or fall back to location service
-        let countryCode = country ?? locationService.currentCountry
+        // Use provided country or fall back to default (India) instead of location service
+        let countryCode = country ?? defaultCountry
         queryItems.append(URLQueryItem(name: "country", value: countryCode))
         
         // Add language parameter

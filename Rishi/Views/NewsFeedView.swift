@@ -1,18 +1,19 @@
 import SwiftUI
 
 struct NewsFeedView: View {
-    @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var userSettings: UserSettings
     @StateObject private var viewModel: NewsViewModel
     @State private var searchText = ""
+    @State private var showCountrySelector = false
     
     init() {
-        // Initialize with nil for now, will be set in onAppear
+        // Will be updated in onAppear with userSettings
         _viewModel = StateObject(wrappedValue: NewsViewModel())
     }
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(spacing: 0) {
                 // Search bar
                 HStack {
                     Image(systemName: "magnifyingglass")
@@ -33,28 +34,41 @@ struct NewsFeedView: View {
                         }
                     }
                 }
-                .padding(8)
+                .padding(10)
                 .background(Color(.systemGray6))
                 .cornerRadius(10)
                 .padding(.horizontal)
+                .padding(.top, 10)
                 
-                // Location indicator
-                HStack {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(.blue)
-                    Text("News for \(viewModel.userCountryName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    
-                    if locationService.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .padding(.trailing, 5)
+                // Location selector button
+                Button(action: {
+                    showCountrySelector = true
+                }) {
+                    HStack {
+                        Text(userSettings.selectedCountry.flag)
+                            .font(.title3)
+                        
+                        Text("News for \(userSettings.selectedCountry.name)")
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6).opacity(0.5))
+                    .cornerRadius(8)
                 }
+                .buttonStyle(PlainButtonStyle())
                 .padding(.horizontal)
-                .padding(.bottom, 5)
+                .padding(.vertical, 8)
+                
+                Divider()
+                    .padding(.bottom, 5)
                 
                 // Content
                 if viewModel.isLoading {
@@ -108,7 +122,32 @@ struct NewsFeedView: View {
                         
                         Text("No news found")
                             .font(.headline)
+                        
+                        if !searchText.isEmpty {
+                            Text("Try another search term or region")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+                        } else {
+                            Text("Try selecting a different region")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+                        }
+                        
+                        Button(action: {
+                            showCountrySelector = true
+                        }) {
+                            Text("Select Region")
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .padding(.top, 16)
                     }
+                    .padding()
                     Spacer()
                 } else {
                     List {
@@ -136,19 +175,18 @@ struct NewsFeedView: View {
                 }
             }
             .navigationTitle("Rishi News")
+            .sheet(isPresented: $showCountrySelector) {
+                CountrySelector(isPresented: $showCountrySelector)
+                    .environmentObject(userSettings)
+            }
             .onAppear {
-                // Create a new viewModel with the correct locationService when the view appears
-                // This is necessary because we can't access @EnvironmentObject in the init
-                if viewModel.userCountry == "us" && locationService.currentCountry != "us" {
-                    let newViewModel = NewsViewModel(locationService: locationService)
-                    // Copy over any state that needs to be preserved
-                    newViewModel.isLoading = viewModel.isLoading
-                    newViewModel.errorMessage = viewModel.errorMessage
-                    // Use reflection to set the StateObject - hacky but works
-                    if let mirror = Mirror(reflecting: _viewModel).children.first,
-                       let binding = mirror.value as? ReferenceWritableKeyPath<NewsFeedView, NewsViewModel> {
-                        self[keyPath: binding] = newViewModel
-                    }
+                // Create new viewModel with correct settings when the view appears
+                let newViewModel = NewsViewModel(userSettings: userSettings)
+                
+                // Use reflection to set the StateObject - hacky but works
+                if let mirror = Mirror(reflecting: _viewModel).children.first,
+                   let binding = mirror.value as? ReferenceWritableKeyPath<NewsFeedView, NewsViewModel> {
+                    self[keyPath: binding] = newViewModel
                 }
             }
         }
