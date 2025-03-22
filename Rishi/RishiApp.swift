@@ -17,7 +17,6 @@ struct RishiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.automatic)
         }
     }
     

@@ -24,7 +24,7 @@ class NewsViewModel: ObservableObject {
                     self?.errorMessage = error.localizedDescription
                 }
             } receiveValue: { [weak self] response in
-                self?.articles = response.articles
+                self?.articles = response.results
             }
             .store(in: &cancellables)
     }
@@ -45,7 +45,7 @@ class NewsViewModel: ObservableObject {
                     self?.errorMessage = error.localizedDescription
                 }
             } receiveValue: { [weak self] response in
-                self?.articles = response.articles
+                self?.articles = response.results
             }
             .store(in: &cancellables)
     }
@@ -61,7 +61,7 @@ class NewsViewModel: ObservableObject {
                     self?.errorMessage = error.localizedDescription
                 }
             } receiveValue: { [weak self] response in
-                self?.articles = response.articles
+                self?.articles = response.results
             }
             .store(in: &cancellables)
     }
