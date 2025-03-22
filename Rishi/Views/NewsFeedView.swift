@@ -1,8 +1,14 @@
 import SwiftUI
 
 struct NewsFeedView: View {
-    @StateObject private var viewModel = NewsViewModel()
+    @EnvironmentObject private var locationService: LocationService
+    @StateObject private var viewModel: NewsViewModel
     @State private var searchText = ""
+    
+    init() {
+        // Initialize with nil for now, will be set in onAppear
+        _viewModel = StateObject(wrappedValue: NewsViewModel())
+    }
     
     var body: some View {
         NavigationView {
@@ -31,7 +37,24 @@ struct NewsFeedView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(10)
                 .padding(.horizontal)
-                .padding(.top)
+                
+                // Location indicator
+                HStack {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.blue)
+                    Text("News for \(viewModel.userCountryName)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    
+                    if locationService.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .padding(.trailing, 5)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 5)
                 
                 // Content
                 if viewModel.isLoading {
@@ -113,6 +136,21 @@ struct NewsFeedView: View {
                 }
             }
             .navigationTitle("Rishi News")
+            .onAppear {
+                // Create a new viewModel with the correct locationService when the view appears
+                // This is necessary because we can't access @EnvironmentObject in the init
+                if viewModel.userCountry == "us" && locationService.currentCountry != "us" {
+                    let newViewModel = NewsViewModel(locationService: locationService)
+                    // Copy over any state that needs to be preserved
+                    newViewModel.isLoading = viewModel.isLoading
+                    newViewModel.errorMessage = viewModel.errorMessage
+                    // Use reflection to set the StateObject - hacky but works
+                    if let mirror = Mirror(reflecting: _viewModel).children.first,
+                       let binding = mirror.value as? ReferenceWritableKeyPath<NewsFeedView, NewsViewModel> {
+                        self[keyPath: binding] = newViewModel
+                    }
+                }
+            }
         }
     }
-} 
+}

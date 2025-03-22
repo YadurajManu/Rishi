@@ -2,16 +2,19 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @EnvironmentObject private var locationService: LocationService
     
     var body: some View {
         TabView(selection: $selectedTab) {
             NewsFeedView()
+                .environmentObject(locationService)
                 .tabItem {
                     Label("Top News", systemImage: "newspaper")
                 }
                 .tag(0)
             
             CategoryView()
+                .environmentObject(locationService)
                 .tabItem {
                     Label("Categories", systemImage: "list.bullet")
                 }
@@ -70,11 +73,29 @@ struct CategoryView: View {
 }
 
 struct CategoryNewsView: View {
+    @EnvironmentObject private var locationService: LocationService
     let category: String
-    @StateObject private var viewModel = NewsViewModel()
+    @StateObject private var viewModel: NewsViewModel
+    
+    init(category: String) {
+        self.category = category
+        _viewModel = StateObject(wrappedValue: NewsViewModel())
+    }
     
     var body: some View {
         VStack {
+            // Location indicator
+            HStack {
+                Image(systemName: "location.fill")
+                    .foregroundColor(.blue)
+                Text("News for \(viewModel.userCountryName)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 5)
+            
             if viewModel.isLoading {
                 ProgressView()
                     .scaleEffect(1.5)
@@ -125,6 +146,18 @@ struct CategoryNewsView: View {
         }
         .navigationTitle(category.capitalized)
         .onAppear {
+            // Create a new viewModel with the correct locationService when the view appears
+            if viewModel.userCountry == "us" && locationService.currentCountry != "us" {
+                let newViewModel = NewsViewModel(locationService: locationService)
+                // Copy over any state that needs to be preserved
+                newViewModel.isLoading = viewModel.isLoading
+                newViewModel.errorMessage = viewModel.errorMessage
+                // Use reflection to set the StateObject - hacky but works
+                if let mirror = Mirror(reflecting: _viewModel).children.first,
+                   let binding = mirror.value as? ReferenceWritableKeyPath<CategoryNewsView, NewsViewModel> {
+                    self[keyPath: binding] = newViewModel
+                }
+            }
             loadCategoryNews()
         }
     }

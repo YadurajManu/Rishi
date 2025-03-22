@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct RishiApp: App {
+    @StateObject private var locationService = LocationService()
+    
     // Register app defaults
     init() {
         registerDefaults()
@@ -17,6 +19,10 @@ struct RishiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(locationService)
+                .onAppear {
+                    locationService.requestLocationPermission()
+                }
         }
     }
     
