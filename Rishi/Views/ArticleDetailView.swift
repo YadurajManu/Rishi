@@ -161,7 +161,9 @@ struct ArticleDetailView: View {
             SafariView(url: URL(string: article.url) ?? URL(string: "https://apple.com")!)
         }
         .sheet(isPresented: $showShareSheet) {
-            ShareSheet(items: [URL(string: article.url)!])
+            if let url = URL(string: article.url) {
+                ShareSheet(items: [url])
+            }
         }
     }
     
@@ -181,23 +183,9 @@ struct ArticleDetailView: View {
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
     
-    func makeUIViewController(context: UIViewControllerRepresentableContext<SafariView>) -> SFSafariViewController {
+    func makeUIViewController(context: Context) -> SFSafariViewController {
         return SFSafariViewController(url: url)
     }
     
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
-        // No updates needed
-    }
-}
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: UIViewControllerRepresentableContext<ShareSheet>) -> UIActivityViewController {
-        return UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: UIViewControllerRepresentableContext<ShareSheet>) {
-        // No updates needed
-    }
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 } 
