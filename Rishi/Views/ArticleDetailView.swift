@@ -4,6 +4,7 @@ import SafariServices
 struct ArticleDetailView: View {
     let article: Article
     @State private var showSafari = false
+    @State private var showShareSheet = false
     @EnvironmentObject private var userSettings: UserSettings
     
     var body: some View {
@@ -92,25 +93,75 @@ struct ArticleDetailView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
                 
-                // Read full article button
-                Button(action: {
-                    showSafari = true
-                }) {
-                    Text("Read Full Article")
+                // Action buttons
+                HStack(spacing: 20) {
+                    // Read full article button
+                    Button(action: {
+                        showSafari = true
+                    }) {
+                        HStack {
+                            Image(systemName: "safari")
+                            Text("Read Full Article")
+                        }
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.blue)
                         .cornerRadius(8)
+                    }
+                    
+                    // Share button
+                    Button(action: {
+                        showShareSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Share")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(8)
+                    }
+                    
+                    // Bookmark button
+                    Button(action: {
+                        userSettings.toggleBookmark(for: article)
+                    }) {
+                        HStack {
+                            Image(systemName: userSettings.isArticleBookmarked(article) ? "bookmark.fill" : "bookmark")
+                            Text(userSettings.isArticleBookmarked(article) ? "Saved" : "Save")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(userSettings.isArticleBookmarked(article) ? Color.orange : Color.gray)
+                        .cornerRadius(8)
+                    }
                 }
                 .padding()
             }
             .padding(.vertical)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    userSettings.toggleBookmark(for: article)
+                }) {
+                    Image(systemName: userSettings.isArticleBookmarked(article) ? "bookmark.fill" : "bookmark")
+                }
+            }
+        }
         .sheet(isPresented: $showSafari) {
             SafariView(url: URL(string: article.url) ?? URL(string: "https://apple.com")!)
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: [URL(string: article.url)!])
         }
     }
     
@@ -135,6 +186,18 @@ struct SafariView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
+        // No updates needed
+    }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: UIViewControllerRepresentableContext<ShareSheet>) -> UIActivityViewController {
+        return UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: UIViewControllerRepresentableContext<ShareSheet>) {
         // No updates needed
     }
 } 

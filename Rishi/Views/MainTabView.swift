@@ -274,33 +274,215 @@ struct CategoryNewsView: View {
 }
 
 struct BookmarksView: View {
+    @EnvironmentObject private var userSettings: UserSettings
+    @State private var searchText = ""
+    @State private var showShareSheet = false
+    @State private var itemToShare: URL?
+    
+    var filteredBookmarks: [Article] {
+        if searchText.isEmpty {
+            return userSettings.bookmarkedArticles
+        } else {
+            return userSettings.bookmarkedArticles.filter { article in
+                article.title.lowercased().contains(searchText.lowercased()) ||
+                (article.description?.lowercased().contains(searchText.lowercased()) ?? false)
+            }
+        }
+    }
+    
     var body: some View {
         NavigationView {
-            VStack {
-                Image(systemName: "bookmark.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                    .padding()
+            VStack(spacing: 0) {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                    
+                    TextField("Search bookmarks", text: $searchText)
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+                .padding(.horizontal)
+                .padding(.top, 10)
                 
-                Text("Bookmarks Coming Soon")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                
-                Text("You'll be able to save your favorite articles here.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                    .padding(.top, 8)
+                if filteredBookmarks.isEmpty {
+                    Spacer()
+                    VStack(spacing: 20) {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.blue)
+                        
+                        if searchText.isEmpty {
+                            Text("No Bookmarks Yet")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                            
+                            Text("Save articles to read later by tapping the bookmark icon")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        } else {
+                            Text("No Matching Bookmarks")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                            
+                            Text("Try another search term")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(filteredBookmarks) { article in
+                            BookmarkedArticleRow(article: article, onShare: {
+                                itemToShare = URL(string: article.url)
+                                showShareSheet = true
+                            }, onRemove: {
+                                userSettings.toggleBookmark(for: article)
+                            })
+                        }
+                        .onDelete { indexSet in
+                            for index in indexSet {
+                                userSettings.toggleBookmark(for: filteredBookmarks[index])
+                            }
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                }
             }
             .navigationTitle("Bookmarks")
+            .sheet(isPresented: $showShareSheet) {
+                if let url = itemToShare {
+                    ShareSheet(items: [url])
+                }
+            }
         }
+    }
+}
+
+struct BookmarkedArticleRow: View {
+    let article: Article
+    let onShare: () -> Void
+    let onRemove: () -> Void
+    
+    var body: some View {
+        NavigationLink(destination: ArticleDetailView(article: article)) {
+            HStack(alignment: .center, spacing: 12) {
+                if let imageUrl = article.urlToImage, !imageUrl.isEmpty {
+                    AsyncImage(url: URL(string: imageUrl)) { phase in
+                        switch phase {
+                        case .empty:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 80)
+                                .cornerRadius(8)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 80)
+                                .cornerRadius(8)
+                                .clipped()
+                        case .failure:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 80)
+                                .cornerRadius(8)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .foregroundColor(.gray)
+                                )
+                        @unknown default:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 80)
+                                .cornerRadius(8)
+                        }
+                    }
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 80, height: 80)
+                        .cornerRadius(8)
+                        .overlay(
+                            Image(systemName: "newspaper")
+                                .foregroundColor(.gray)
+                        )
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(article.title)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(2)
+                    
+                    Text(article.source.name)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Text(formattedDate(from: article.publishedAt))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Button(action: onShare) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                        
+                        Button(action: onRemove) {
+                            Image(systemName: "bookmark.slash.fill")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func formattedDate(from dateString: String) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        
+        if let date = dateFormatter.date(from: dateString) {
+            dateFormatter.dateFormat = "MMM d, yyyy"
+            return dateFormatter.string(from: date)
+        }
+        
+        return ""
     }
 }
 
 struct SettingsView: View {
     @EnvironmentObject private var userSettings: UserSettings
     @State private var showCountrySelector = false
+    @State private var showInterestsSelector = false
+    
+    let refreshOptions = [
+        (0, "Off"),
+        (15, "15 minutes"),
+        (30, "30 minutes"),
+        (60, "1 hour"),
+        (120, "2 hours")
+    ]
     
     var body: some View {
         NavigationView {
@@ -324,6 +506,30 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section(header: Text("Personalization")) {
+                    NavigationLink(destination: InterestSelectorView(isPresented: $showInterestsSelector)) {
+                        HStack {
+                            Text("Interests")
+                            
+                            Spacer()
+                            
+                            if userSettings.interests.isEmpty {
+                                Text("None selected")
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("\(userSettings.interests.count) selected")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Picker("Auto Refresh", selection: $userSettings.autoRefreshInterval) {
+                        ForEach(refreshOptions, id: \.0) { option in
+                            Text(option.1).tag(option.0)
+                        }
+                    }
+                }
+                
                 Section(header: Text("Appearance")) {
                     Toggle("Dark Mode", isOn: $userSettings.darkMode)
                     
@@ -336,6 +542,12 @@ struct SettingsView: View {
                 
                 Section(header: Text("Notifications")) {
                     Toggle("Enable Notifications", isOn: $userSettings.notificationsEnabled)
+                    
+                    if userSettings.notificationsEnabled {
+                        NavigationLink(destination: NotificationSettingsView()) {
+                            Text("Notification Settings")
+                        }
+                    }
                 }
                 
                 Section(header: Text("About")) {
@@ -360,7 +572,59 @@ struct SettingsView: View {
                 CountrySelector(isPresented: $showCountrySelector)
                     .environmentObject(userSettings)
             }
+            .sheet(isPresented: $showInterestsSelector) {
+                InterestSelectorView(isPresented: $showInterestsSelector)
+                    .environmentObject(userSettings)
+            }
         }
+    }
+}
+
+struct NotificationSettingsView: View {
+    @EnvironmentObject private var userSettings: UserSettings
+    
+    var body: some View {
+        List {
+            Section(header: Text("Notification Types")) {
+                ForEach(userSettings.getAllCategories(), id: \.self) { category in
+                    Toggle(category.capitalized, isOn: Binding(
+                        get: { userSettings.showCategories[category] ?? true },
+                        set: { userSettings.showCategories[category] = $0 }
+                    ))
+                }
+            }
+            
+            Section(header: Text("Breaking News")) {
+                Toggle("Breaking News Alerts", isOn: .constant(true))
+                    .tint(.red)
+            }
+            
+            Section(header: Text("Personalized Updates")) {
+                Toggle("Interest-based Alerts", isOn: .constant(true))
+                Text("Receive notifications about news related to your selected interests")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Section(header: Text("Quiet Hours")) {
+                Toggle("Enable Quiet Hours", isOn: .constant(false))
+                
+                HStack {
+                    Text("From")
+                    Spacer()
+                    Text("10:00 PM")
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    Text("To")
+                    Spacer()
+                    Text("7:00 AM")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .navigationTitle("Notification Settings")
     }
 }
 

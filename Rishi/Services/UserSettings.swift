@@ -10,6 +10,9 @@ class UserSettings: ObservableObject {
         static let notificationsEnabled = "notificationsEnabled"
         static let fontSize = "fontSize"
         static let showCategories = "showCategories"
+        static let bookmarkedArticles = "bookmarkedArticles"
+        static let interests = "interests"
+        static let autoRefreshInterval = "autoRefreshInterval"
     }
     
     // Current selected country
@@ -43,6 +46,31 @@ class UserSettings: ObservableObject {
             if let data = try? JSONEncoder().encode(showCategories) {
                 UserDefaults.standard.set(data, forKey: Keys.showCategories)
             }
+        }
+    }
+    
+    // Bookmarked articles
+    @Published var bookmarkedArticles: [Article] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(bookmarkedArticles) {
+                UserDefaults.standard.set(data, forKey: Keys.bookmarkedArticles)
+            }
+        }
+    }
+    
+    // User interests for content personalization
+    @Published var interests: [String] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(interests) {
+                UserDefaults.standard.set(data, forKey: Keys.interests)
+            }
+        }
+    }
+    
+    // Auto-refresh interval in minutes (0 = disabled)
+    @Published var autoRefreshInterval: Int {
+        didSet {
+            UserDefaults.standard.set(autoRefreshInterval, forKey: Keys.autoRefreshInterval)
         }
     }
     
@@ -83,6 +111,16 @@ class UserSettings: ObservableObject {
         "health", "politics", "science", "sports", "technology", "top", "world"
     ]
     
+    // Interest suggestions by category
+    private let interestSuggestions: [String: [String]] = [
+        "business": ["finance", "stocks", "economy", "startups", "investment", "markets"],
+        "technology": ["AI", "software", "gadgets", "web development", "mobile", "programming"],
+        "health": ["fitness", "nutrition", "medicine", "wellness", "mental health", "covid"],
+        "sports": ["cricket", "football", "tennis", "olympics", "basketball", "hockey"],
+        "entertainment": ["movies", "music", "celebrities", "television", "streaming", "bollywood"],
+        "science": ["space", "research", "environment", "climate", "discoveries", "biology"]
+    ]
+    
     init() {
         // Load country or use default (India)
         let savedCountryCode = UserDefaults.standard.string(forKey: Keys.countryCode) ?? "in"
@@ -106,6 +144,21 @@ class UserSettings: ObservableObject {
             defaultCategories.forEach { initialCategories[$0] = true }
             self.showCategories = initialCategories
         }
+        
+        // Load bookmarked articles
+        if let data = UserDefaults.standard.data(forKey: Keys.bookmarkedArticles),
+           let decoded = try? JSONDecoder().decode([Article].self, from: data) {
+            self.bookmarkedArticles = decoded
+        }
+        
+        // Load interests
+        if let data = UserDefaults.standard.data(forKey: Keys.interests),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            self.interests = decoded
+        }
+        
+        // Auto-refresh interval
+        self.autoRefreshInterval = UserDefaults.standard.integer(forKey: Keys.autoRefreshInterval)
     }
     
     // Get all available categories
@@ -116,5 +169,48 @@ class UserSettings: ObservableObject {
     // Get visible categories
     func getVisibleCategories() -> [String] {
         return showCategories.filter { $0.value }.map { $0.key }
+    }
+    
+    // Bookmark management
+    func isArticleBookmarked(_ article: Article) -> Bool {
+        return bookmarkedArticles.contains { $0.id == article.id }
+    }
+    
+    func toggleBookmark(for article: Article) {
+        if isArticleBookmarked(article) {
+            bookmarkedArticles.removeAll { $0.id == article.id }
+        } else {
+            bookmarkedArticles.append(article)
+        }
+    }
+    
+    // Interest management
+    func getSuggestedInterests(forCategory category: String? = nil) -> [String] {
+        if let category = category, let suggestions = interestSuggestions[category] {
+            return suggestions
+        }
+        
+        // Return all suggestions
+        var allSuggestions: [String] = []
+        for suggestions in interestSuggestions.values {
+            allSuggestions.append(contentsOf: suggestions)
+        }
+        return Array(Set(allSuggestions)).sorted()
+    }
+    
+    func isInterestSelected(_ interest: String) -> Bool {
+        return interests.contains(interest)
+    }
+    
+    func toggleInterest(_ interest: String) {
+        if isInterestSelected(interest) {
+            interests.removeAll { $0 == interest }
+        } else {
+            interests.append(interest)
+        }
+    }
+    
+    func clearAllInterests() {
+        interests.removeAll()
     }
 } 
