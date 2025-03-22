@@ -11,368 +11,374 @@ struct ArticleDetailView: View {
     @State private var bookmarkScale: CGFloat = 1.0
     @State private var showRelatedArticles = false
     @State private var showFullText = true // Simulated for the prototype
+    @State private var showWebView = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var scrollViewHeight: CGFloat = 0
+    @State private var progressPercentage: Double = 0
+    @State private var showProgress = false
+    @ObservedObject var newsService = NewsService()
     @EnvironmentObject private var userSettings: UserSettings
     
     var body: some View {
-        GeometryReader { geometry in
+        ScrollViewReader { scrollProxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Featured Image
-                    if let imageUrl = article.urlToImage, !imageUrl.isEmpty {
-                        AsyncImage(url: URL(string: imageUrl)) { phase in
-                            switch phase {
-                            case .empty:
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .aspectRatio(16/9, contentMode: .fill)
-                                    .frame(height: 250)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 250)
-                                    .clipped()
-                            case .failure:
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .aspectRatio(16/9, contentMode: .fill)
-                                    .frame(height: 250)
-                                    .overlay(
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.gray)
-                                    )
-                            @unknown default:
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .aspectRatio(16/9, contentMode: .fill)
-                                    .frame(height: 250)
-                            }
-                        }
-                        .overlay(
-                            VStack {
-                                HStack {
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        toggleBookmark()
-                                    }) {
-                                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                                            .font(.title2)
-                                            .foregroundColor(isBookmarked ? .yellow : .white)
-                                            .padding(10)
-                                            .background(Color.black.opacity(0.6))
-                                            .clipShape(Circle())
-                                            .scaleEffect(bookmarkScale)
-                                            .shadow(radius: 2)
-                                    }
-                                    .padding(.trailing, 16)
-                                    .padding(.top, 16)
-                                }
-                                
-                                Spacer()
-                                
-                                // Source overlay on image
-                                HStack {
-                                    Text(article.source.name)
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.black.opacity(0.7))
-                                        .cornerRadius(5)
-                                        .padding(.leading, 16)
-                                        .padding(.bottom, 16)
-                                    
-                                    Spacer()
-                                }
-                            }
-                        )
-                    }
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header with image
+                    headerView
                     
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Header with date and reading time
-                        HStack {
-                            Text(formattedDate(from: article.publishedAt))
-                                .font(.system(size: userSettings.fontSize.textSize - 2))
-                                .foregroundColor(.secondary)
+                    // Article content
+                    contentView
+                    
+                    // Reading progress
+                    if showProgress {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Reading Progress")
+                                .font(.headline)
+                                .padding(.top, 8)
                             
-                            Spacer()
-                            
-                            Text("\(estimateReadingTime()) min read")
-                                .font(.system(size: userSettings.fontSize.textSize - 2))
-                                .foregroundColor(.secondary)
+                            HStack {
+                                ProgressView(value: progressPercentage, total: 1.0)
+                                    .progressViewStyle(LinearProgressViewStyle())
+                                    .frame(height: 8)
+                                
+                                Text("\(Int(progressPercentage * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         .padding(.horizontal)
-                        .padding(.top, 8)
-                        
-                        // Title
-                        Text(article.title)
-                            .font(.system(size: userSettings.fontSize.headlineSize + 4))
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                        
-                        // Author
-                        if let author = article.author, !author.isEmpty {
-                            HStack {
-                                Image(systemName: "person")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                                
-                                Text(author)
-                                    .font(.system(size: userSettings.fontSize.textSize))
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        // Description
-                        if let description = article.description, !description.isEmpty {
-                            Text(description)
-                                .font(.system(size: userSettings.fontSize.textSize + 2))
-                                .fontWeight(.medium)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-                        }
-                        
-                        // Full content (simulated for prototype)
-                        if showFullText {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("This is a simulated full text of the article. In a real app, this would be the complete article content fetched from the API or the source website. The content would include paragraphs, quotes, embedded media, and more.")
-                                    .font(.system(size: userSettings.fontSize.textSize))
-                                    .padding(.horizontal)
-                                
-                                Text("The content would continue here with more information about the article topic. This could include background information, expert opinions, or related developments.")
-                                    .font(.system(size: userSettings.fontSize.textSize))
-                                    .padding(.horizontal)
-                                
-                                Text("Additional paragraphs would provide more depth on the topic, potentially including statistics, historical context, or future implications.")
-                                    .font(.system(size: userSettings.fontSize.textSize))
-                                    .padding(.horizontal)
-                                
-                                // Read more button
-                                Button(action: {
-                                    showSafari = true
-                                }) {
-                                    Text("Read the full article on \(article.source.name)")
-                                        .font(.system(size: userSettings.fontSize.textSize))
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(userSettings.appTheme.accentColor)
-                                        .cornerRadius(8)
-                                        .padding(.horizontal)
-                                }
-                                .padding(.top, 8)
-                            }
-                            .padding(.top, 16)
-                        } else {
-                            // Read more button
-                            Button(action: {
-                                showSafari = true
-                            }) {
-                                Text("Read the full article on \(article.source.name)")
-                                    .font(.system(size: userSettings.fontSize.textSize))
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(userSettings.appTheme.accentColor)
-                                    .cornerRadius(8)
-                                    .padding(.horizontal)
-                            }
-                            .padding(.top, 16)
-                        }
-                        
-                        // Action buttons
-                        HStack(spacing: 16) {
-                            Spacer()
-                            
-                            Button(action: {
-                                showShareSheet = true
-                            }) {
-                                VStack {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .font(.title3)
-                                    Text("Share")
-                                        .font(.caption)
-                                }
-                                .foregroundColor(userSettings.appTheme.accentColor)
-                            }
-                            
-                            Button(action: {
-                                toggleBookmark()
-                            }) {
-                                VStack {
-                                    Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                                        .font(.title3)
-                                    Text(isBookmarked ? "Saved" : "Save")
-                                        .font(.caption)
-                                }
-                                .foregroundColor(isBookmarked ? .yellow : userSettings.appTheme.accentColor)
-                            }
-                            
-                            Button(action: {
-                                showRelatedArticles.toggle()
-                            }) {
-                                VStack {
-                                    Image(systemName: "rectangle.stack")
-                                        .font(.title3)
-                                    Text("Related")
-                                        .font(.caption)
-                                }
-                                .foregroundColor(userSettings.appTheme.accentColor)
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(.vertical, 16)
-                        
-                        // Related articles section
-                        if showRelatedArticles {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Related Articles")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(0..<3) { i in
-                                    HStack(spacing: 12) {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.gray.opacity(0.3))
-                                            .frame(width: 60, height: 60)
-                                            .overlay(
-                                                Image(systemName: "newspaper")
-                                                    .foregroundColor(.gray)
-                                            )
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Related article #\(i+1) title would appear here")
-                                                .font(.subheadline)
-                                                .lineLimit(2)
-                                            
-                                            Text("Source name • Timeframe")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                    .background(Color(.systemGray6).opacity(0.5))
-                                    .cornerRadius(8)
-                                    .padding(.horizontal)
-                                }
-                            }
-                            .padding(.bottom, 16)
+                    }
+                    
+                    // Divider before related articles
+                    Divider()
+                        .padding(.vertical)
+                    
+                    // Related articles section
+                    relatedArticlesView
+                }
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: geometry.frame(in: .named("scrollView")).minY
+                        )
+                    }
+                )
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.onAppear {
+                            scrollViewHeight = geometry.size.height
                         }
                     }
-                }
-                .onAppear {
-                    // Mark article as read
-                    userSettings.markArticleAsRead(article)
+                )
+            }
+            .coordinateSpace(name: "scrollView")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                // Calculate scroll percentage
+                let contentHeight = scrollViewHeight
+                if contentHeight > 0 {
+                    let offsetPercentage = max(0, min(1, Double(-offset) / Double(contentHeight)))
+                    progressPercentage = offsetPercentage
                     
-                    // Check bookmark status
-                    isBookmarked = userSettings.isArticleBookmarked(article)
+                    // Save progress to UserSettings
+                    userSettings.updateArticleProgress(for: article.url, progress: progressPercentage)
                 }
-                .onChange(of: geometry.frame(in: .global).minY) { value in
-                    // Track reading progress
-                    let offset = -value
-                    let contentHeight = geometry.size.height
-                    
-                    if offset <= 0 {
-                        readingProgress = 0
-                    } else if offset >= contentHeight {
-                        readingProgress = 1
-                    } else {
-                        readingProgress = min(offset / contentHeight, 1)
+            }
+            .onAppear {
+                // Mark article as read
+                userSettings.markArticleAsRead(article)
+                
+                // Check if article is bookmarked
+                isBookmarked = userSettings.isArticleBookmarked(article)
+                
+                // Load related articles
+                newsService.fetchRelatedArticles(to: article)
+                
+                // Load saved progress if any
+                progressPercentage = userSettings.getArticleProgress(for: article.url)
+                if progressPercentage > 0.1 {
+                    showProgress = true
+                }
+                
+                // After a short delay, show the progress indicator if the user hasn't seen this article before
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation {
+                        showProgress = true
                     }
                 }
-                .navigationBarItems(
-                    trailing: Button(action: {
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(
+                trailing: HStack {
+                    Button(action: {
                         showShareSheet = true
                     }) {
                         Image(systemName: "square.and.arrow.up")
                     }
-                )
-            }
-            .overlay(
-                GeometryReader { geometry in
-                    ProgressView(value: readingProgress, total: 1.0)
-                        .progressViewStyle(LinearProgressViewStyle(tint: userSettings.appTheme.accentColor))
-                        .frame(height: 3)
-                        .frame(width: geometry.size.width)
-                        .position(x: geometry.size.width / 2, y: 0)
-                        .opacity(readingProgress > 0 ? 1 : 0)
+                    
+                    Button(action: {
+                        toggleBookmark()
+                    }) {
+                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                            .foregroundColor(isBookmarked ? .yellow : .blue)
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isBookmarked)
+                    
+                    Button(action: {
+                        showWebView = true
+                    }) {
+                        Image(systemName: "safari")
+                    }
                 }
             )
-            .sheet(isPresented: $showSafari) {
-                if let url = URL(string: article.url) {
-                    SafariView(url: url)
-                }
+            .sheet(isPresented: $showWebView) {
+                SafariWebView(url: URL(string: article.url)!)
             }
             .sheet(isPresented: $showShareSheet) {
-                if let url = URL(string: article.url) {
-                    ShareSheet(items: [url])
-                }
-            }
-            .onTapGesture(count: 2) {
-                toggleBookmark()
+                ShareSheet(activityItems: [URL(string: article.url)!])
             }
         }
     }
     
-    private func formattedDate(from dateString: String) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-        
-        if let date = dateFormatter.date(from: dateString) {
-            dateFormatter.dateFormat = "MMMM d, yyyy"
-            return dateFormatter.string(from: date)
+    private var headerView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let imageUrl = article.urlToImage, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 200)
+                            .clipped()
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 200)
+                            .clipped()
+                            .overlay(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.black.opacity(0.5), Color.clear]),
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
+                            )
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 200)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 200)
+                    }
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text(article.title)
+                    .font(.system(size: userSettings.fontSize.headlineSize))
+                    .fontWeight(.bold)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                HStack {
+                    Text(article.source.name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if let publishedAt = ISO8601DateFormatter().date(from: article.publishedAt) {
+                        Text(formatDate(publishedAt))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                HStack {
+                    Label("\(article.readingTime) min read", systemImage: "clock")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Button(action: { toggleBookmark() }) {
+                        Label(isBookmarked ? "Bookmarked" : "Bookmark", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
+                            .font(.caption)
+                            .foregroundColor(isBookmarked ? .yellow : .blue)
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                }
+            }
+            .padding(.horizontal)
         }
-        
-        return ""
+    }
+    
+    private var contentView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let description = article.description {
+                Text(description)
+                    .font(.system(size: userSettings.fontSize.textSize + 2))
+                    .fontWeight(.medium)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal)
+            }
+            
+            // AI Summary section
+            ArticleSummaryView(article: article)
+                .padding(.horizontal)
+            
+            if let content = article.content {
+                // Clean up content if needed (remove truncation markers)
+                let cleanContent = content.replacingOccurrences(of: "… \\[\\+\\d+ chars\\]", with: "...", options: .regularExpression)
+                
+                Text(cleanContent)
+                    .font(.system(size: userSettings.fontSize.textSize))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal)
+            }
+            
+            if let author = article.author, !author.isEmpty {
+                Text("By \(author)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
+            
+            Button(action: {
+                showWebView = true
+            }) {
+                Text("Read full article")
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(userSettings.appTheme.accentColor)
+                    .cornerRadius(8)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+    }
+    
+    private var relatedArticlesView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Related Articles")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            if newsService.relatedArticles.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(newsService.relatedArticles) { article in
+                            NavigationLink(destination: ArticleDetailView(article: article)) {
+                                RelatedArticleCard(article: article)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
     }
     
     private func toggleBookmark() {
+        if isBookmarked {
+            userSettings.removeBookmark(article)
+        } else {
+            userSettings.addBookmark(article)
+        }
+        isBookmarked.toggle()
+        
+        // Add haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-            bookmarkScale = 1.3
-            isBookmarked.toggle()
-        }
-        
-        // Animate back to normal size
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                bookmarkScale = 1.0
-            }
-        }
-        
-        // Update bookmarks
-        if isBookmarked {
-            userSettings.addBookmark(article)
-        } else {
-            userSettings.removeBookmark(article)
-        }
     }
     
-    private func estimateReadingTime() -> Int {
-        let wordsPerMinute = 200
-        var wordCount = article.title.split(separator: " ").count
-        
-        if let description = article.description {
-            wordCount += description.split(separator: " ").count
-        }
-        
-        // Simulate content words
-        wordCount += 500
-        
-        let readingTime = max(1, Int(ceil(Double(wordCount) / Double(wordsPerMinute))))
-        return readingTime
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 }
 
-struct SafariView: UIViewControllerRepresentable {
+struct RelatedArticleCard: View {
+    let article: Article
+    @EnvironmentObject private var userSettings: UserSettings
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let imageUrl = article.urlToImage, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(8)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(16/9, contentMode: .fill)
+                            .frame(height: 100)
+                            .cornerRadius(8)
+                            .clipped()
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(8)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .cornerRadius(8)
+                    }
+                }
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .cornerRadius(8)
+                    .overlay(
+                        Image(systemName: "newspaper")
+                            .foregroundColor(.gray)
+                    )
+            }
+            
+            Text(article.title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .lineLimit(2)
+                .foregroundColor(.primary)
+            
+            Text(article.source.name)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(width: 200)
+    }
+}
+
+struct SafariWebView: UIViewControllerRepresentable {
     let url: URL
     
     func makeUIViewController(context: Context) -> SFSafariViewController {
@@ -380,6 +386,13 @@ struct SafariView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
-        // No updates needed
+        // Nothing to do
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 } 

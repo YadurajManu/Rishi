@@ -16,6 +16,8 @@ class UserSettings: ObservableObject {
         static let readArticles = "readArticles"
         static let readingHistory = "readingHistory"
         static let appTheme = "appTheme"
+        static let preferredSources = "preferredSources"
+        static let articleProgress = "articleProgress"
     }
     
     // Current selected country
@@ -104,6 +106,24 @@ class UserSettings: ObservableObject {
     @Published var appTheme: AppTheme {
         didSet {
             UserDefaults.standard.set(appTheme.rawValue, forKey: Keys.appTheme)
+        }
+    }
+    
+    // Preferred news sources
+    @Published var preferredSources: [NewsSource] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(preferredSources) {
+                UserDefaults.standard.set(data, forKey: Keys.preferredSources)
+            }
+        }
+    }
+    
+    // Article reading progress - stores how far the user has read in each article
+    @Published var articleProgress: [String: Double] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(articleProgress) {
+                UserDefaults.standard.set(data, forKey: Keys.articleProgress)
+            }
         }
     }
     
@@ -276,6 +296,22 @@ class UserSettings: ObservableObject {
         } else {
             self.readArticles = []
         }
+        
+        // Load preferred news sources
+        if let data = UserDefaults.standard.data(forKey: Keys.preferredSources),
+           let decoded = try? JSONDecoder().decode([NewsSource].self, from: data) {
+            self.preferredSources = decoded
+        } else {
+            self.preferredSources = []
+        }
+        
+        // Load article reading progress
+        if let data = UserDefaults.standard.data(forKey: Keys.articleProgress),
+           let decoded = try? JSONDecoder().decode([String: Double].self, from: data) {
+            self.articleProgress = decoded
+        } else {
+            self.articleProgress = [:]
+        }
     }
     
     // MARK: - Helper Methods
@@ -302,19 +338,29 @@ class UserSettings: ObservableObject {
         return suggestions.sorted()
     }
     
+    // MARK: - Bookmark Management
+    
     func addBookmark(_ article: Article) {
         if !isArticleBookmarked(article) {
             bookmarkedArticles.append(article)
+            // Add haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
         }
     }
     
     func removeBookmark(_ article: Article) {
         bookmarkedArticles.removeAll { $0.url == article.url }
+        // Add subtle haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
     
     func isArticleBookmarked(_ article: Article) -> Bool {
         return bookmarkedArticles.contains { $0.url == article.url }
     }
+    
+    // MARK: - Reading History Management
     
     func markArticleAsRead(_ article: Article) {
         readArticles.insert(article.url)
@@ -333,6 +379,16 @@ class UserSettings: ObservableObject {
         readArticles.removeAll()
     }
     
+    // MARK: - Article Progress Management
+    
+    func updateArticleProgress(for articleUrl: String, progress: Double) {
+        articleProgress[articleUrl] = progress
+    }
+    
+    func getArticleProgress(for articleUrl: String) -> Double {
+        return articleProgress[articleUrl] ?? 0.0
+    }
+    
     // MARK: - Interest Management
     
     func toggleInterest(_ interest: String) {
@@ -349,5 +405,23 @@ class UserSettings: ObservableObject {
     
     func clearAllInterests() {
         interests.removeAll()
+    }
+    
+    // MARK: - News Source Management
+    
+    func toggleSource(_ source: NewsSource) {
+        if isSourceSelected(source) {
+            preferredSources.removeAll { $0.id == source.id }
+        } else {
+            preferredSources.append(source)
+        }
+    }
+    
+    func isSourceSelected(_ source: NewsSource) -> Bool {
+        return preferredSources.contains { $0.id == source.id }
+    }
+    
+    func clearAllSources() {
+        preferredSources.removeAll()
     }
 } 

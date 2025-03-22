@@ -9,8 +9,11 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var userSettings: UserSettings
+    @EnvironmentObject private var newsService: NewsService
     @AppStorage("onboardingComplete") private var onboardingComplete = false
     @State private var showOnboarding = false
+    
+    @State private var autoRefreshTimer: Timer? = nil
     
     var body: some View {
         Group {
@@ -21,12 +24,46 @@ struct ContentView: View {
             } else {
                 MainTabView()
                     .environmentObject(userSettings)
+                    .environmentObject(newsService)
             }
         }
         .preferredColorScheme(userSettings.darkMode ? .dark : .light)
         .onAppear {
             if !onboardingComplete {
                 showOnboarding = true
+            }
+            setupAutoRefresh()
+        }
+        .onChange(of: userSettings.autoRefreshInterval) { newValue in
+            setupAutoRefresh()
+        }
+    }
+    
+    private func setupAutoRefresh() {
+        // Cancel existing timer if any
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
+        
+        // If auto-refresh is enabled (interval > 0), set up a new timer
+        if userSettings.autoRefreshInterval > 0 {
+            let interval = TimeInterval(userSettings.autoRefreshInterval * 60) // Convert minutes to seconds
+            autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+                // Refresh news data
+                newsService.fetchTopHeadlines(country: userSettings.selectedCountry.id)
+                
+                if !userSettings.interests.isEmpty {
+                    newsService.fetchPersonalizedNews(interests: userSettings.interests)
+                }
+                
+                // Fetch Guardian news
+                newsService.fetchGuardianArticles(section: "world")
+                
+                // Refresh category news for visible categories
+                for (category, isVisible) in userSettings.showCategories {
+                    if isVisible {
+                        newsService.fetchCategoryNews(category: category, country: userSettings.selectedCountry.id)
+                    }
+                }
             }
         }
     }
